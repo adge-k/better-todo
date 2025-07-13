@@ -1,5 +1,3 @@
-use std::fmt;
-
 use dioxus::prelude::*;
 use ollama_rs::{
     Ollama, generation::{
@@ -9,6 +7,7 @@ use ollama_rs::{
 };
 use tokio_stream::StreamExt;
 use serde::{Deserialize, Serialize};
+use dioxus_html::input_data::keyboard_types::Key;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
@@ -43,11 +42,11 @@ pub struct Task {
     pub content: String,
 }
 
-impl Task {
-    fn next(task: Task) -> Self {
-        Task { content: "Test".to_string() }
-    }
-}
+// impl Task {
+//     fn next(task: Task) -> Self {
+//         Task { content: "Test".to_string() }
+//     }
+// }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Todo {
@@ -123,9 +122,9 @@ enum OllamaState {
 impl std::fmt::Display for OllamaState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            OllamaState::Idle => write!(f, "Idle"),
-            OllamaState::Generating => write!(f, "Generating"),
-            OllamaState::Completed(_) => write!(f, "Completed"),
+            OllamaState::Idle => write!(f, "Idle..."),
+            OllamaState::Generating => write!(f, "Generating..."),
+            OllamaState::Completed(_) => write!(f, "Completed!"),
             OllamaState::Error(e) => write!(f, "Error: {}", e),
         }
     }
@@ -146,9 +145,9 @@ fn TodoApp() -> Element {
     // Function to generate todos using Ollama
     let generate_todos = move |input: String| {
         spawn(async move {
-            // Set state to generating
+            // Set state to generating which the UI elements should be disabling for
             ollama_state.set(OllamaState::Generating);
-            
+
             // PSEUDOCODE: This is where the Ollama integration happens
             match generate_todo_breakdown(input).await {
                 Ok(todo) => {
@@ -156,7 +155,6 @@ fn TodoApp() -> Element {
                     let mut current_todos = generated_todos.read().clone();
                     current_todos.push(todo.clone());
                     generated_todos.set(current_todos);
-                    
                     // Update state to completed
                     ollama_state.set(OllamaState::Completed(todo));
                 },
@@ -187,35 +185,31 @@ fn TodoApp() -> Element {
                     class: "todo-input",
                     placeholder: "New item",
                     value: "{user_input}",
-                    oninput: move |event| user_input.set(event.value()),
-                    disabled: matches!(*ollama_state.read(), OllamaState::Generating),
-                }
-
-                // We don't want the button, it should just trigger off of "enter" being pressed,
-                // or the above input div losing focus.
-                button {
-                    class: "generate-button",
-                    disabled: user_input.read().trim().is_empty() || matches!(*ollama_state.read(), OllamaState::Generating),
-                    onclick: move |_| {
-                        let input = user_input.read().clone();
-                        if !input.trim().is_empty() {
-                            generate_todos(input);
-                            user_input.set(String::new()); // Clear input
+                    // Make sure this remains, as it's what is filling the user_input variable.
+                    // TODO(adge-k): This could probably be made more efficient by reading the final input value somehow
+                    oninput: move |event| {
+                        user_input.set(event.value().to_string());
+                    },
+                    onkeydown: move |event| {
+                        if event.key() == Key::Enter {
+                            println!("Enter key pressed!");
+                            // Now user_input will have the latest value because oninput updates it
+                            let input = user_input.read().clone();
+                            println!("Detected input: {}", input);
+                            if !input.trim().is_empty() {
+                                println!("Input ({}) is not empty", input);
+                                generate_todos(input);
+                                user_input.set(String::new()); // Clear input
+                            }
                         }
                     },
-
-                    // Dynamic button text based on state
-                    match *ollama_state.read() {
-                        OllamaState::Generating => "Generating...",
-                        _ => "Generate Tasks"
-                    }
+                    disabled: matches!(*ollama_state.read(), OllamaState::Generating),  // Disables the button if state is "Generating"
                 }
 
                 // Generated todos display
                 // This should actually just be a child div of the todo it was generated from
                 div {
                     class: "todos-section",
-                    
                     if !generated_todos.read().is_empty() {
                         h2 { "Generated Todo Lists" }
                         
@@ -237,14 +231,7 @@ fn TodoApp() -> Element {
         // Status indicator
         div {
             id: "status-bar",   
-            p { "{ollama_state.read().to_string()}" },             
-            // match ollama_state.read().clone() {
-            //     rsx! { p { "{OllamaState::Idle}" } },
-            //     // OllamaState::Idle => rsx! { p { "Ready to generate todos" } },
-            //     OllamaState::Generating => rsx! { p { "Generating..." } },
-            //     OllamaState::Completed(_) => rsx! { p { "Tasks generated successfully!" } },
-            //     OllamaState::Error(err) => rsx! { p { "Error: {err}" } },
-            // }
+            p { "{ollama_state.read().to_string()}" },
         }
     }
 }
@@ -301,11 +288,13 @@ async fn generate_todo_breakdown(input: String) -> Result<Todo, Box<dyn std::err
     let control = control_prompt();
     let prompt = format!("{}. The todo is: {}", control, input);
     
+    println!("Beginning request to Ollama now...");
     // Make the streaming request
     let mut resp = ollama
         .generate_stream(GenerationRequest::new(model, prompt).format(FormatType::Json))
         .await?;
     
+    println!("Response received!");
     // Collect streaming response
     let mut raw_data: Vec<String> = vec![];
     while let Some(res) = resp.next().await {
@@ -318,6 +307,8 @@ async fn generate_todo_breakdown(input: String) -> Result<Todo, Box<dyn std::err
     // Parse the response into our Todo structure
     let todo = Todo::from_string(raw_data.join(""));
     
+    println!("Final todos: {:?}", todo);
+
     Ok(todo)
 }
 
