@@ -1,0 +1,71 @@
+/* App-wide styling */
+body {
+    background-color: black;
+    border: #fff solid 1px;
+    color: #ffffff;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    margin: 20px;
+}
+
+.new-entry {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    align-self: center;
+    padding: 20px;
+}
+
+input[type="text"] {
+    color: #fff;
+    margin: 0;
+    width: 90%;
+    height: 10px;
+    padding: 20px;
+    background-color: #1e222d;
+    border-radius: 10px;
+    transition: height 0.4s ease-in-out;
+}
+
+input[type="text"]:focus {
+    height: 30px;
+}
+
+input[type="checkbox"] {
+    margin: 0;
+    width: 20px;
+    height: 20px;
+    padding: 20px;
+    float: left;
+}
+
+label[for="todo-checkbox"] {
+    color: red;
+    font-weight: bold;
+}
+
+input[type="checkbox"]:checked {
+    font-style: italic;
+}
+
+.item-entry {
+    color: white;
+}
+
+#current-todos {
+}
+
+#status {
+    display: flex;
+    justify-content: left;
+    align-self: bottom;
+}
+
+#hero {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
